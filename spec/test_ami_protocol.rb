@@ -6,13 +6,16 @@ context "Establishing a socket" do
   include AmiProtocolTestHelper
   
   it "should read the AMI version at the beginning" do
-    parser_with(a_socket_sending_only("Asterisk Version: 1.0\r\n")).version.should.not.be.nil
+    sample_version = 1.0
+    parser_with(a_socket_sending_only("Asterisk Version: #{sample_version}\r\n")).version.should.equal sample_version
   end
+  
+  
   
   it "should raise an error when the version is not there" do
     the_following_code {
       parser_with(a_socket_sending_only("Asterisk Version: 1.0\r\n")).version.should.not.be.nil
-    }.should.raise VersionNotSentAtSocketCreation
+    }.should.not.raise
   end
 end
 
@@ -27,7 +30,7 @@ context "BufferedLineReadingStream" do
   it "lines retain the trailing whitespace" do
     read_lines = []
     recipient  = message_recipient { |line| read_lines << line }
-    sample_socket_data = "a\r\nm\r\ni\r\n\r\nf\r\nt\r\nw"
+    sample_socket_data = "a\r\nm\r\ni\r\n\r\nf\r\nt\r\nw\r\n\r\n"
     line_reader = line_reader_for(a_socket_sending_only(sample_socket_data), recipient)
     line_reader.start!
     read_lines.should == ["a\r\n", "m\r\n", "i\r\n", "\r\n", "f\r\n", "t\r\n", "w\r\n", "\r\n"]
@@ -52,10 +55,8 @@ BEGIN {
     
     def message_recipient(&block)
       returning Object.new do |obj|
-        class << obj
-          def continue_with_line(data)
-            block.call data
-          end
+        obj.meta_def(:continue_with_line) do |data|
+          block.call data
         end
       end
     end

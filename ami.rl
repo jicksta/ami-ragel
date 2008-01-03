@@ -8,10 +8,10 @@ class RagelGeneratedAMIProtocolStateMachine
 	end
   
   def version
-    raise NotImplementedError
+    @version = -1
   end
   
-	%%{
+%%{
 	
 		machine AsteriskManagerInterfaceProtocolParser;
 	
@@ -21,8 +21,8 @@ class RagelGeneratedAMIProtocolStateMachine
 	
 		# key_value_pair = ([^:] -- line_break)+ /:( )*+/ any*;
 	
-	}%%
-	
+}%%
+
 end
 
 class BufferedLineReadingStream
@@ -31,7 +31,13 @@ class BufferedLineReadingStream
   end
   
   def start!
-    loop { @recipient.send(@continue_message, @io.readline) }
+    loop { @recipient.send(@method_name, @io.readline) } unless finished?
+  rescue EOFError
+    @finished = true
+  end
+  
+  def finished?
+    @finished
   end
 end
 
