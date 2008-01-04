@@ -73,7 +73,11 @@ BEGIN {
   module AmiProtocolTestHelper
   
     def format_newlines(string)
-      string.gsub /([^\r])\n/, "#{$1}\n"
+      # HOLY FUCK THIS IS UGLY
+      tmp_replacement = random_string
+      string.gsub("\r\n", tmp_replacement).
+             gsub("\n", "\r\n").
+             gsub(tmp_replacement, "\r\n")
     end
  
     def parser_with(stream)
@@ -100,5 +104,10 @@ BEGIN {
       end
     end
     
+    private
+    
+    def random_string
+      (rand(1_000_000_000_000) + 1_000_000_000).to_s
+    end
   end
 }
