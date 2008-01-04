@@ -10,8 +10,6 @@ context "Establishing a socket" do
     parser_with(a_socket_sending_only("Asterisk Version: #{sample_version}\r\n")).version.should.equal sample_version
   end
   
-  
-  
   it "should raise an error when the version is not there" do
     the_following_code {
       parser_with(a_socket_sending_only("Asterisk Version: 1.0\r\n")).version.should.not.be.nil
@@ -20,6 +18,27 @@ context "Establishing a socket" do
 end
 
 context "Reading of an action" do
+  
+  include AmiProtocolTestHelper
+  
+  it "should handle a 'Response: Follows' action properly" do
+
+    multi_line_response_body = %{Ragel is a software development tool that allows user actions to
+    be embedded into the transitions of a regular expression’s corresponding state machine,
+    eliminating the need to switch from the regular expression engine and user code execution
+    environment and back again.}
+
+    multi_line_response = format_newlines <<-RESPONSE
+ActionID: 123
+Response: Follows
+#{multi_line_response_body}
+--END COMMAND--
+RESPONSE
+    parser = parser_with a_socket_sending_only(multi_line_response)
+    
+    # CONCEPTUAL DILEMMA! HOW DOES THE PARSER SEND BACK RESPONSES?
+    parser.wait_for_next_action.body.should == multi_line_response_body
+  end
   
 end
 
@@ -38,8 +57,24 @@ context "BufferedLineReadingStream" do
   
 end
 
+
+context "AmiProtocolTestHelper" do
+  
+  include AmiProtocolTestHelper
+  
+  it "should only replace newlines not preceded by carriage returns" do
+    before, after = "   i am\n  on a line\r\nkthxbai\n",
+                    "   i am\r\n  on a line\r\nkthxbai\r\n"
+    format_newlines(before).should == after
+  end
+end
+
 BEGIN {
   module AmiProtocolTestHelper
+  
+    def format_newlines(string)
+      string.gsub /([^\r])\n/, "#{$1}\n"
+    end
  
     def parser_with(stream)
       RagelGeneratedAMIProtocolStateMachine.new
@@ -47,6 +82,10 @@ BEGIN {
     
     def line_reader_for(stream, line_handler)
       BufferedLineReadingStream.new stream, line_handler
+    end
+    
+    def action_proxy_with_mock_socket_sending(&block)
+      
     end
     
     def a_socket_sending_only(data)

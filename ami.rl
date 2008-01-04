@@ -11,8 +11,8 @@ class RagelGeneratedAMIProtocolStateMachine
     @version = -1
   end
   
+  
 %%{
-	
 		machine AsteriskManagerInterfaceProtocolParser;
 	
 		carriage_return = "\r";
