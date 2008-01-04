@@ -8,7 +8,7 @@ data  = "13j111ay37"
   machine foo;
   write data;
   
-  main := [0-9]+ >{ puts "FIRST" } "jay" >{puts 'SECOND'} [0-9]+ >{puts 'THIRD'};
+  main := [0-9]+ %{ puts "FIRST" } "jay" %{puts 'SECOND'} [0-9]+ %{puts 'THIRD'};
   
   write init;
   write exec;

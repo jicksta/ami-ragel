@@ -1,3 +1,4 @@
+
 class RagelGeneratedAMIProtocolStateMachine
 
   # To decouple the state machine with the socket layer, there are actually
@@ -10,8 +11,7 @@ class RagelGeneratedAMIProtocolStateMachine
   def version
     @version = -1
   end
-  
-  
+
 %%{
 		machine AsteriskManagerInterfaceProtocolParser;
 	
