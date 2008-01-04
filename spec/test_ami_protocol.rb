@@ -57,7 +57,6 @@ context "BufferedLineReadingStream" do
   
 end
 
-
 context "AmiProtocolTestHelper" do
   
   include AmiProtocolTestHelper
