@@ -1,6 +1,9 @@
 require File.join(File.dirname(__FILE__), "spec_helper")
 require File.join(File.dirname(__FILE__), *%w[.. ami.rb])
 
+# MUST ALWAYS SEPARATE THE COLONS WITH WHITESPAC
+# TEST THAT IT CAN PARSE EVENTS
+
 context "Establishing a socket" do
   
   include AmiProtocolTestHelper
