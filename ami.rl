@@ -1,3 +1,4 @@
+require File.join(File.dirname(__FILE__), 'packets.rb')
 
 class RagelGeneratedAMIProtocolStateMachine
 
@@ -15,22 +16,44 @@ class RagelGeneratedAMIProtocolStateMachine
     
     action after_prompt  { after_prompt  }
     action before_prompt { before_prompt }
-    action open_version  { begin_capturing:version  }
-    action close_version { finish_capturing:version }
+    action open_version  { begin_capturing_variable:version  }
+    action close_version { finish_capturing_variable:version }
     
-  	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version;
+    action before_key    { begin_capturing_key  }
+    action after_key     { finish_capturing_key }
+    
+    action before_value  { begin_capturing_value  }
+    action after_value   { finish_capturing_value }
+    
+    action init_success {
+      @current_message = NormalAmiResponse.new
+    }
+    
+    action report {
+      print "."
+    }
+    
+  	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version crlf;
+  	KeyValuePair = (alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf;
+  	
+  	action parse_successful_response {
+  	  return @current_message
+  	}
+  	
     ActionID = "ActionID: " rest_of_line;
     
 		Response 	= "Response: ";
-		Success		= Response "Success" crlf;
-		Pong 			= Response "Pong" crlf;
-		Error 		= Response "Error" crlf;
-		Events		= Response "Events " ("On" | "Off") crlf;
-		Follows 		= Response "Follows" crlf;
-    EndFollows 	= "--END COMMAND--" crlf;
+		Success		= Response "Success" %init_success crlf @{ fgoto success; };
+    Pong      = Response "Pong" %init_success crlf;
     
+		# Error 		= Response "Error" crlf;
+		# Events		= Response "Events " ("On" | "Off") crlf;
+		# Follows 		= Response "Follows" crlf;
+    # EndFollows 	= "--END COMMAND--" crlf;
     
-  	main := Prompt >before_prompt crlf @after_prompt;
+  	main := Prompt? (Success | Pong) @parse_successful_response;
+    success := KeyValuePair %{ puts "got a k/v pair!" };
+    
     
   }%% # %
 
@@ -42,29 +65,33 @@ class RagelGeneratedAMIProtocolStateMachine
   end
   
   def execute_with(data)
-    @data = data
+    
+    # TODO: These are only instance variable so other methods can access them.
+    # It should probably be designed such that the other methods request this
+    # as an argument.
+    @data, @current_position = data, 0
+    
     %%{
-			variable p        @current_position;
-			variable pe       @data_end_position;
-			variable cs       @current_state;
-			variable act      @most_recent_successful_pattern_match;
-			variable data     @data;
-			variable tokstart @token_start_position;
-			variable tokend   @token_end_position;
+      # All other variables become local, letting Ruby garbage collect them. This
+      # prevents us from having to manually reset them.
+      
+			variable p    @current_position;
+			variable data @data;
 			
-      write data;  
-      write init;  
+      write data;
+      write init;
       write exec;
     }%%
-    @data = nil
   end
   alias << execute_with
   
-  def begin_capturing(variable_name)
+  private
+  
+  def begin_capturing_variable(variable_name)
     CAPTURES_IN_PROGRESS[variable_name] = @current_position
   end
   
-  def finish_capturing(variable_name)
+  def finish_capturing_variable(variable_name)
     start, stop = CAPTURES_IN_PROGRESS.delete(variable_name), @current_position
     return unless start && start < stop
     capture = @data[start...stop]
@@ -72,15 +99,44 @@ class RagelGeneratedAMIProtocolStateMachine
     CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
   end
   
-  def before_prompt
-    puts "before prompt!"
+  def begin_capturing_key
+    @current_key_position = @current_position
   end
   
-  def after_prompt
-    puts "after prompt!!"
+  def finish_capturing_key
+    puts "done capturing key"
+    @current_key = @data[@current_key_position...@current_position]
   end
   
-  private
+  def begin_capturing_value
+    puts "capturing value"
+    @current_value_position = @current_position
+  end
+  
+  def finish_capturing_value
+    puts "capturing value"
+    @current_value = @data[@current_value_position...@current_position]
+    add_pair_to_current_message
+  end
+  
+  def add_pair_to_current_message
+    @current_message[@current_key] = @current_value
+    reset_key_and_value_positions
+  end
+  
+  # def reset_state_machine_variables
+  #   @current_position = 0
+  #   @data_end_position
+  #   @current_state,
+  #   @most_recent_successful_pattern_match,
+  #   @data,
+  #   @token_start_position,
+  #   @token_end_position = 
+  # end
+  
+  def reset_key_and_value_positions
+    @current_key, @current_value, @current_key_position, @current_value_position = nil
+  end
   
   def capture_callback_for(variable_name, &block)
     CAPTURE_CALLBACKS[variable_name] = block
