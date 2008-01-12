@@ -9,5 +9,5 @@ packets = ["Asterisk Call Manager/1.0\r\n",
            "Event: Registry\r\nPrivilege: system,all\r\nChannelDriver: SIP\r\nDomain: proxy.voip.ms\r\nStatus: Registered\r\n\r\n"]
 
 packets.each do |packet|
-  parser << packet
+  p parser << packet
 end

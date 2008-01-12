@@ -1,3 +1,6 @@
+require 'rubygems'
+require 'active_support'
+
 require File.join(File.dirname(__FILE__), 'packets.rb')
 
 class RagelGeneratedAMIProtocolStateMachine
@@ -29,6 +32,12 @@ class RagelGeneratedAMIProtocolStateMachine
       @current_message = NormalAmiResponse.new
     }
     
+    action init_event {
+      event_name = finish_capturing_variable:event_name
+      @current_message = Event.new event_name
+      puts "Instantiated new event"
+    }
+    
     action report {
       print "."
     }
@@ -46,14 +55,15 @@ class RagelGeneratedAMIProtocolStateMachine
 		Success		= Response "Success" %init_success crlf @{ fgoto success; };
     Pong      = Response "Pong" %init_success crlf;
     
+    Event     = "Event:" [ ]* %{begin_capturing_variable:event_name} rest_of_line %init_event crlf @{ fgoto success; };
+    
 		# Error 		= Response "Error" crlf;
 		# Events		= Response "Events " ("On" | "Off") crlf;
 		# Follows 		= Response "Follows" crlf;
     # EndFollows 	= "--END COMMAND--" crlf;
     
-  	main := Prompt? (Success | Pong) @parse_successful_response;
-    success := KeyValuePair %{ puts "got a k/v pair!" };
-    
+  	main := Prompt? (Success | Pong | Event) @parse_successful_response;
+    success := KeyValuePair @{ puts "got a k/v pair!" };
     
   }%% # %
 
@@ -93,10 +103,11 @@ class RagelGeneratedAMIProtocolStateMachine
   
   def finish_capturing_variable(variable_name)
     start, stop = CAPTURES_IN_PROGRESS.delete(variable_name), @current_position
-    return unless start && start < stop
-    capture = @data[start...stop]
-    CAPTURED_VARIABLES[variable_name] = capture
-    CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
+    return :failed unless start && start < stop
+    returning @data[start...stop] do |capture|
+      CAPTURED_VARIABLES[variable_name] = capture
+      CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
+    end
   end
   
   def begin_capturing_key
@@ -104,17 +115,14 @@ class RagelGeneratedAMIProtocolStateMachine
   end
   
   def finish_capturing_key
-    puts "done capturing key"
     @current_key = @data[@current_key_position...@current_position]
   end
   
   def begin_capturing_value
-    puts "capturing value"
     @current_value_position = @current_position
   end
   
   def finish_capturing_value
-    puts "capturing value"
     @current_value = @data[@current_value_position...@current_position]
     add_pair_to_current_message
   end
@@ -123,16 +131,6 @@ class RagelGeneratedAMIProtocolStateMachine
     @current_message[@current_key] = @current_value
     reset_key_and_value_positions
   end
-  
-  # def reset_state_machine_variables
-  #   @current_position = 0
-  #   @data_end_position
-  #   @current_state,
-  #   @most_recent_successful_pattern_match,
-  #   @data,
-  #   @token_start_position,
-  #   @token_end_position = 
-  # end
   
   def reset_key_and_value_positions
     @current_key, @current_value, @current_key_position, @current_value_position = nil
