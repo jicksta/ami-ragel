@@ -63,7 +63,7 @@ class RagelGeneratedAMIProtocolStateMachine
     # EndFollows 	= "--END COMMAND--" crlf;
     
   	main := Prompt? (Success | Pong | Event crlf) @parse_successful_response;
-    success := KeyValuePair+ ;
+    success := KeyValuePair+ crlf @parse_successful_response;
     
   }%% # %
 
