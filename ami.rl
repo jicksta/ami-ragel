@@ -43,7 +43,7 @@ class RagelGeneratedAMIProtocolStateMachine
     }
     
   	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version crlf;
-  	KeyValuePair = ((alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf)+;
+  	KeyValuePair = ((alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf)+ crlf;
   	
   	action parse_successful_response {
   	  return @current_message
@@ -62,7 +62,7 @@ class RagelGeneratedAMIProtocolStateMachine
 		# Follows 		= Response "Follows" crlf;
     # EndFollows 	= "--END COMMAND--" crlf;
     
-  	main := Prompt? (Success | Pong | Event) @parse_successful_response;
+  	main := Prompt? (Success | Pong | Event crlf) @parse_successful_response;
     success := KeyValuePair @{ puts "got a k/v pair!" };
     
   }%% # %
