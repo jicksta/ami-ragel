@@ -38,10 +38,6 @@ class RagelGeneratedAMIProtocolStateMachine
       puts "Instantiated new event"
     }
     
-    action report {
-      print "."
-    }
-    
   	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version crlf;
   	KeyValuePair = (alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf;
   	

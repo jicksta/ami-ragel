@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 def ragel_to_ruby
-  ragel_file = ARGV.first || File.dirname(__FILE__) + "/ami.rl"
+  ragel_file = File.dirname(__FILE__) + "/ami.rl"
   ruby_output = ragel_file[0..-2] + 'b'
   puts `ragel -n -R #{ragel_file} | rlgen-ruby -o #{ruby_output}`
   

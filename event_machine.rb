@@ -1,5 +1,5 @@
 require 'rubygems'
-require 'event_machine'
+require 'eventmachine'
 
 module EchoServer
   def receive_data(data)
@@ -8,4 +8,6 @@ module EchoServer
   end
 end
 
-EventMachine.start_server '0.0.0.0', 1337, EchoServer
+EventMachine.run do
+  EventMachine.start_server '0.0.0.0', 1337, EchoServer
+end

@@ -9,13 +9,17 @@ context "Establishing a socket" do
   include AmiProtocolTestHelper
   
   it "should read the AMI version at the beginning" do
-    sample_version = 1.0
-    parser_with(a_socket_sending_only("Asterisk Version: #{sample_version}\r\n")).version.should.equal sample_version
+    sample_version = 99.76234 # Doesn't matter
+    parser = new_parser
+    parser.execute_with "Asterisk Call Manager/#{sample_version}\r\n"
+    parser.version.should.equal sample_version
   end
   
   it "should raise an error when the version is not there" do
     the_following_code {
-      parser_with(a_socket_sending_only("Asterisk Version: 1.0\r\n")).version.should.not.be.nil
+      parser = new_parser
+      parser.execute_with("Asterisk Call Manager/1.0\r\n")
+      parser.version.should.not.be.nil
     }.should.not.raise
   end
 end
@@ -37,10 +41,9 @@ Response: Follows
 #{multi_line_response_body}
 --END COMMAND--
 RESPONSE
-    parser = parser_with a_socket_sending_only(multi_line_response)
     
-    # CONCEPTUAL DILEMMA! HOW DOES THE PARSER SEND BACK RESPONSES?
-    parser.wait_for_next_action.body.should == multi_line_response_body
+    parser = new_parser
+    parser.execute_with(multi_line_response).body.should == multi_line_response_body
   end
   
 end
@@ -82,7 +85,11 @@ BEGIN {
              gsub(tmp_replacement, "\r\n")
     end
  
-    def parser_with(stream)
+    def parse_string(string)
+      new_parser.execute_with string
+    end
+ 
+    def new_parser
       RagelGeneratedAMIProtocolStateMachine.new
     end
     
