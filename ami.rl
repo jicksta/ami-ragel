@@ -5,11 +5,10 @@ require File.join(File.dirname(__FILE__), 'packets.rb')
 
 class RagelGeneratedAMIProtocolStateMachine
 
-  CAPTURES_IN_PROGRESS = {}
   CAPTURED_VARIABLES   = {}
   CAPTURE_CALLBACKS    = {}
 
-  %%{
+  %%{ #%#
   	machine ami_protocol_parser;
     
   	carriage_return = "\r";
@@ -17,10 +16,10 @@ class RagelGeneratedAMIProtocolStateMachine
   	crlf            = carriage_return line_feed;
     rest_of_line    = (any* -- crlf);
     
-    action after_prompt  { after_prompt  }
     action before_prompt { before_prompt }
-    action open_version  { begin_capturing_variable:version  }
-    action close_version { finish_capturing_variable:version }
+    action after_prompt  { after_prompt  }
+    action open_version  { begin_capturing_variable  :version }
+    action close_version { finish_capturing_variable :version }
     
     action before_key    { begin_capturing_key  }
     action after_key     { finish_capturing_key }
@@ -28,12 +27,13 @@ class RagelGeneratedAMIProtocolStateMachine
     action before_value  { begin_capturing_value  }
     action after_value   { finish_capturing_value }
     
+    # Executed after a "Respone: Success" or a Pong
     action init_success {
       @current_message = NormalAmiResponse.new
     }
     
     action init_event {
-      event_name = finish_capturing_variable:event_name
+      event_name = finish_capturing_variable :event_name
       @current_message = Event.new event_name
       puts "Instantiated new event"
     }
@@ -94,16 +94,16 @@ class RagelGeneratedAMIProtocolStateMachine
   private
   
   def begin_capturing_variable(variable_name)
-    CAPTURES_IN_PROGRESS[variable_name] = @current_position
+    @start_of_current_capture = @current_position
   end
   
   def finish_capturing_variable(variable_name)
-    start, stop = CAPTURES_IN_PROGRESS.delete(variable_name), @current_position
-    return :failed unless start && start < stop
-    returning @data[start...stop] do |capture|
-      CAPTURED_VARIABLES[variable_name] = capture
-      CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
-    end
+    start, stop = @start_of_current_capture, @current_position
+    return :failed if !start || start > stop
+    capture = @data[start...stop]
+    CAPTURED_VARIABLES[variable_name] = capture
+    CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
+    capture
   end
   
   def begin_capturing_key
