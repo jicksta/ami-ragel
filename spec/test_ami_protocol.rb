@@ -8,16 +8,19 @@ context "Establishing a socket" do
   
   include AmiProtocolTestHelper
   
+  attr_reader :parser
+  before :each do
+    parser = new_parser
+  end
+  
   it "should read the AMI version at the beginning" do
     sample_version = 99.76234 # Doesn't matter
-    parser = new_parser
     parser.execute_with "Asterisk Call Manager/#{sample_version}\r\n"
     parser.version.should.equal sample_version
   end
   
   it "should raise an error when the version is not there" do
     the_following_code {
-      parser = new_parser
       parser.execute_with("Asterisk Call Manager/1.0\r\n")
       parser.version.should.not.be.nil
     }.should.not.raise
@@ -27,6 +30,11 @@ end
 context "Reading of an action" do
   
   include AmiProtocolTestHelper
+  
+  attr_reader :parser, :incomplete_packet
+  before :each do
+    @parser = new_parser
+  end
   
   it "should handle a 'Response: Follows' action properly" do
 
@@ -46,19 +54,9 @@ RESPONSE
     parser.execute_with(multi_line_response).body.should == multi_line_response_body
   end
   
-end
-
-context "BufferedLineReadingStream" do
-  
-  include AmiProtocolTestHelper
-  
-  it "lines retain the trailing whitespace" do
-    read_lines = []
-    recipient  = message_recipient { |line| read_lines << line }
-    sample_socket_data = "a\r\nm\r\ni\r\n\r\nf\r\nt\r\nw\r\n\r\n"
-    line_reader = line_reader_for(a_socket_sending_only(sample_socket_data), recipient)
-    line_reader.start!
-    read_lines.should == ["a\r\n", "m\r\n", "i\r\n", "\r\n", "f\r\n", "t\r\n", "w\r\n", "\r\n"]
+  it "should resume when given an arbirary amount of data" do
+    flexmock(parser).should_receive(:message_received).once
+    parser << 
   end
   
 end
@@ -90,7 +88,7 @@ BEGIN {
     end
  
     def new_parser
-      RagelGeneratedAMIProtocolStateMachine.new
+      AmiStreamParser.new
     end
     
     def line_reader_for(stream, line_handler)

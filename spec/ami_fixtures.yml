@@ -1,0 +1,14 @@
+
+:login:
+  :standard:
+    :client:
+      Action: Login
+      Username: :string
+      Secret: :string
+      Events: {one_of: ["on", "off"]}
+    :success:
+      Response: Success
+      Message: Authentication accepted
+    :fail:
+      Response: Error
+      Message: Authentication failed

@@ -3,7 +3,7 @@ require 'active_support'
 
 require File.join(File.dirname(__FILE__), 'packets.rb')
 
-class RagelGeneratedAMIProtocolStateMachine
+class AmiStreamParser
 
   CAPTURED_VARIABLES   = {}
   CAPTURE_CALLBACKS    = {}
@@ -41,9 +41,7 @@ class RagelGeneratedAMIProtocolStateMachine
   	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version crlf;
   	KeyValuePair = (alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf;
   	
-  	action parse_successful_response {
-  	  return @current_message
-  	}
+  	action message_received { message_received @current_message }
   	
     ActionID = "ActionID: " rest_of_line;
     
@@ -58,8 +56,8 @@ class RagelGeneratedAMIProtocolStateMachine
 		# Follows 		= Response "Follows" crlf;
     # EndFollows 	= "--END COMMAND--" crlf;
     
-  	main := Prompt? (Success | Pong | Event crlf) @parse_successful_response;
-    success := KeyValuePair+ crlf @parse_successful_response;
+  	main := Prompt? (Success | Pong | Event crlf) @message_received;
+    success := KeyValuePair+ crlf @message_received;
     
   }%% # %
 
@@ -104,6 +102,11 @@ class RagelGeneratedAMIProtocolStateMachine
     CAPTURED_VARIABLES[variable_name] = capture
     CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
     capture
+  end
+  
+  # This method must do someting with @current_message or it'll be lost.
+  def message_received(current_message)
+    current_message
   end
   
   def begin_capturing_key
