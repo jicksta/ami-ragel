@@ -10,18 +10,18 @@ context "Establishing a socket" do
   
   attr_reader :parser
   before :each do
-    parser = new_parser
+    @parser = new_parser
   end
   
   it "should read the AMI version at the beginning" do
     sample_version = 99.76234 # Doesn't matter
-    parser.execute_with "Asterisk Call Manager/#{sample_version}\r\n"
+    parser << "Asterisk Call Manager/#{sample_version}\r\n"
     parser.version.should.equal sample_version
   end
   
   it "should raise an error when the version is not there" do
     the_following_code {
-      parser.execute_with("Asterisk Call Manager/1.0\r\n")
+      parser << "Asterisk Call Manager/1.0\r\n"
       parser.version.should.not.be.nil
     }.should.not.raise
   end
@@ -50,13 +50,38 @@ Response: Follows
 --END COMMAND--
 RESPONSE
     
-    parser = new_parser
     parser.execute_with(multi_line_response).body.should == multi_line_response_body
   end
   
   it "should resume when given an arbirary amount of data" do
-    flexmock(parser).should_receive(:message_received).once
-    parser << 
+    flexmock(parser).should_receive(:ami_error!).once.and_return nil
+    error_message = fixture 'errors/missing_action'
+    piece_one = error_message[0...3]
+    piece_two = error_message[3..-1]
+    parser << piece_one
+    parser << piece_two
+  end
+    
+  it "should tell ami_error! when an error comes in" do
+    flexmock(parser).should_receive(:ami_error!).once.and_return nil
+    error_message = "Response: Error\r\nMessage: Missing action in request\r\n\r\n"
+    parser << fixture('errors/missing_action')
+  end
+  
+  it "should let the buffer grow when it's not full" do
+    error_message = fixture 'errors/missing_action'
+    parser << error_message
+    parser << error_message
+    parser.send(:instance_variable_get, :@data_ending_pointer).should.equal error_message.size * 2
+  end
+  
+  it "should recover from unexpected protocol irregularities" do
+    puts "HERE"
+    flexmock(parser).should_receive(:ami_error!).once.and_return nil
+    flexmock(parser).should_receive(:message_received).once.and_return nil
+    parser << fixture('errors/missing_action')
+    parser << "!IJ@MHY!&@B*!B @ ! @^! @ !@ !\r!@ ! @ !@ ! !!m, \n\\n\n\r\n\r\n" + fixture('login/standard/success')
+    puts "DONE"
   end
   
 end

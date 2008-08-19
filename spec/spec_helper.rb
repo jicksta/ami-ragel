@@ -4,6 +4,7 @@ require 'stringio'
 require 'rubygems'
 require 'active_support'
 require 'test/spec'
+require 'flexmock/test_unit'
 require File.dirname(__FILE__) + "/../generate_code"
 
 # Regenerate the Ruby source code
@@ -71,5 +72,18 @@ def fixture(path, overrides={})
     end
     
   end
-  OpenStruct.new selected_event
+  returning hash_to_stanza(selected_event) do |event|
+    selected_event.each_pair do |key, value|
+      event.meta_def(key) { value }
+    end
+  end
+end
+
+def hash_to_stanza(hash)
+  ordered_hash = hash.to_a
+  starter = hash.find { |(key, value)| key =~ /^(Response|Action)$/i }
+  ordered_hash.unshift ordered_hash.delete(starter) if starter
+  ordered_hash.inject(String.new) do |stanza,(key, value)|
+    stanza + "#{key}: #{value}\r\n"
+  end + "\r\n"
 end
