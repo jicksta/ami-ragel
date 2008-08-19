@@ -16,6 +16,9 @@ class NormalAmiResponse
 end
 
 class Event < NormalAmiResponse
+  attr_reader :name
+  attr_accessor :text # For "Response: Follows" sections
+   
   def initialize(name)
     super()
     @name = name.underscore.to_sym

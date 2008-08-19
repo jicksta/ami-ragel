@@ -21,8 +21,8 @@ class AmiStreamParser
     
     action before_prompt { before_prompt }
     action after_prompt  { after_prompt  }
-    action open_version  { begin_capturing_variable  :version }
-    action close_version { finish_capturing_variable :version }
+    action open_version  { open_version }
+    action close_version { close_version }
     
     action before_key    { begin_capturing_key  }
     action after_key     { finish_capturing_key }
@@ -48,11 +48,11 @@ class AmiStreamParser
       @current_message = NormalAmiResponse.new
     }
     
-    action init_event {
-      event_name = finish_capturing_variable :event_name
-      @current_message = Event.new event_name
-      puts "Instantiated new event"
-    }
+    action start_capturing_follows_text { start_capturing_follows_text }
+    action end_capturing_follows_text   { end_capturing_follows_text   }
+    
+    action begin_capturing_event_name { begin_capturing_event_name }
+    action init_event { init_event }
     
   	Prompt = "Asterisk Call Manager/" digit+ >open_version "." digit+ %close_version crlf;
   	KeyValuePair = (alnum | print)+ >before_key %after_key ": " rest_of_line >before_value %after_value crlf;
@@ -61,16 +61,18 @@ class AmiStreamParser
   	
     ActionID = "ActionID: "i rest_of_line;
     
-		Response 	= "Response: "i;
-		Success		= Response "Success"i %init_success crlf @{ fgoto success; };
-    Pong      = Response "Pong"i %init_success crlf;
-    Error     = Response "Error"i crlf "Message: "i @error_reason_start rest_of_line crlf crlf @error_reason_end;
+    FollowsDelimiter = crlf "--END COMMAND--";
+    
+		Response = "Response: "i;
+		Success	 = Response "Success"i %init_success crlf @{ fgoto success; };
+    Pong     = Response "Pong"i %init_success crlf;
+    Error    = Response "Error"i crlf "Message: "i @error_reason_start rest_of_line crlf crlf @error_reason_end;
+    Follows  = Response "Follows" crlf @start_capturing_follows_text (any* -- FollowsDelimiter) FollowsDelimiter @end_capturing_follows_text crlf;
     
     # Events		= Response "Events " ("On" | "Off") crlf;
-		# Follows 		= Response "Follows" crlf;
-    # EndFollows 	= "--END COMMAND--" crlf;
+
     
-    Event     = "Event:"i [ ]* %{begin_capturing_variable:event_name} rest_of_line %init_event crlf @{ fgoto success; };
+    Event     = "Event:"i [ ]* %begin_capturing_event_name rest_of_line %init_event crlf @{ fgoto success; };
     
   	main := Prompt? ((((Success | Pong | Event) crlf @message_received) | (Error crlf))) $err(start_ignoring_syntax_error);
     success := KeyValuePair+ crlf @message_received;
@@ -78,10 +80,8 @@ class AmiStreamParser
     
   }%% # %
 
+  attr_reader :ami_version
   def initialize
-    capture_callback_for :version do |version|
-      @version = version.to_f
-    end
     
     @data = ""
     @current_pointer = 0
@@ -115,11 +115,20 @@ class AmiStreamParser
     p [:ending, {:current_pointer => @current_pointer, :data => @data, :ending => @data_ending_pointer}]
   end
   
+  protected
+  
   def resume!
     %%{ write exec; }%%
   end
   
-  private
+  def open_version
+    @start_of_version = @current_pointer
+  end
+  
+  def close_version
+    @ami_version = @data[@start_of_version...@current_pointer].to_f
+    @start_of_version = nil
+  end
   
   def begin_capturing_variable(variable_name)
     @start_of_current_capture = @current_pointer
@@ -132,6 +141,17 @@ class AmiStreamParser
     CAPTURED_VARIABLES[variable_name] = capture
     CAPTURE_CALLBACKS[variable_name].call(capture) if CAPTURE_CALLBACKS.has_key? variable_name
     capture
+  end
+  
+  def begin_capturing_event_name
+    @event_name_start = @current_pointer
+  end
+  
+  def init_event
+    event_name = @data[@event_name_start]
+    @event_name_start = nil
+    @current_message = Event.new(event_name)
+    puts "Instantiated new event"
   end
   
   # This method must do someting with @current_message or it'll be lost.
@@ -165,6 +185,16 @@ class AmiStreamParser
     @error_reason_start = nil
   end
   
+  def start_capturing_follows_text
+    @follows_text_start = @current_pointer
+  end
+  
+  def end_capturing_follows_text
+    text = @data[@follows_text_start..(@current_pointer - "\r\n--END COMMAND--".size)]
+    @current_message.text = text
+    @follows_text_start = nil
+  end
+  
   def add_pair_to_current_message
     @current_message[@current_key] = @current_value
     reset_key_and_value_positions
@@ -175,11 +205,11 @@ class AmiStreamParser
   end
   
   def start_ignoring_syntax_error
-    @current_syntax_error_start = @current_pointer
+    @current_syntax_error_start = @current_pointer + 1 # Adding 1 since the pointer is still set to the last successful match
   end
   
   def end_ignoring_syntax_error
-    syntax_error! @data[@current_syntax_error_start...@current_pointer]
+    syntax_error! @data[@current_syntax_error_start...@current_pointer - 3] # Subtracting 3 for "\r\n\r" which separates a stanza
     @current_syntax_error_start = nil
   end
   
@@ -195,28 +225,5 @@ class AmiStreamParser
   def syntax_error!(ignored_chunk)
     p "Ignoring this: #{ignored_chunk}"
   end
-  
-end
-
-class BufferedLineReadingStream
-  def initialize(io, recipient, continue_message=:continue_with_line)
-    @io, @recipient, @method_name = io, recipient, continue_message
-  end
-  
-  def start!
-    loop { @recipient.send(@method_name, @io.readline) } unless finished?
-  rescue EOFError
-    @finished = true
-  end
-  
-  def finished?
-    @finished
-  end
-end
-
-class ProtocolIrregularity < Exception
-end
-
-class VersionNotSentAtSocketCreation < ProtocolIrregularity
   
 end

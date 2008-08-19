@@ -16,13 +16,13 @@ context "Establishing a socket" do
   it "should read the AMI version at the beginning" do
     sample_version = 99.76234 # Doesn't matter
     parser << "Asterisk Call Manager/#{sample_version}\r\n"
-    parser.version.should.equal sample_version
+    parser.ami_version.should.equal sample_version
   end
   
   it "should raise an error when the version is not there" do
     the_following_code {
       parser << "Asterisk Call Manager/1.0\r\n"
-      parser.version.should.not.be.nil
+      parser.ami_version.should.not.be.nil
     }.should.not.raise
   end
 end
@@ -43,14 +43,21 @@ context "Reading of an action" do
     eliminating the need to switch from the regular expression engine and user code execution
     environment and back again.}
 
-    multi_line_response = format_newlines <<-RESPONSE
+    multi_line_response = format_newlines <<-RESPONSE + "\r\n"
 ActionID: 123
 Response: Follows
 #{multi_line_response_body}
 --END COMMAND--
 RESPONSE
     
-    parser.execute_with(multi_line_response).body.should == multi_line_response_body
+    parser.meta_def(:message_received) do |message|
+      message.text.should == multi_line_response_body
+      throw :got_here!
+    end
+    
+    the_following_code {
+      parser << multi_line_response
+    }.should.throw :got_here!
   end
   
   it "should resume when given an arbirary amount of data" do
@@ -76,12 +83,12 @@ RESPONSE
   end
   
   it "should recover from unexpected protocol irregularities" do
-    puts "HERE"
+    fuzz = "!IJ@MHY!&@B*!B @ ! @^! @ !@ !\r!@ ! @ !@ ! !!m, \n\\n\n"
     flexmock(parser).should_receive(:ami_error!).once.and_return nil
     flexmock(parser).should_receive(:message_received).once.and_return nil
+    flexmock(parser).should_receive(:syntax_error!).once.with(fuzz)
     parser << fixture('errors/missing_action')
-    parser << "!IJ@MHY!&@B*!B @ ! @^! @ !@ !\r!@ ! @ !@ ! !!m, \n\\n\n\r\n\r\n" + fixture('login/standard/success')
-    puts "DONE"
+    parser << fuzz + "\r\n\r\n" + fixture('login/standard/success')
   end
   
 end
